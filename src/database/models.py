@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from src.app import db
+import json
 
 
 class Property(db.Model):
@@ -22,6 +23,7 @@ class Property(db.Model):
     property_type = db.Column(db.String(50))
     description = db.Column(db.Text)
     image_url = db.Column(db.String(255))
+    images = db.Column(db.JSON)  # Store multiple images as JSON array
     source = db.Column(db.String(100))
     scraped_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(
@@ -34,6 +36,16 @@ class Property(db.Model):
 
     def __repr__(self):
         return f"<Property {self.address}>"
+
+    def get_images(self):
+        """Get list of images."""
+        if self.images:
+            return json.loads(self.images) if isinstance(self.images, str) else self.images
+        return [self.image_url] if self.image_url else []
+
+    def set_images(self, images):
+        """Set list of images."""
+        self.images = json.dumps(images) if images else None
 
     def to_dict(self):
         """Convert to dictionary."""
@@ -48,6 +60,11 @@ class Property(db.Model):
             "square_feet": self.square_feet,
             "property_type": self.property_type,
             "source": self.source,
+            "images": self.get_images(),
+            "description": self.description,
+            "url": self.url,
+            "scraped_at": self.scraped_at.isoformat() if self.scraped_at else None,
+        }
             "scraped_at": self.scraped_at.isoformat() if self.scraped_at else None,
         }
 

@@ -174,6 +174,12 @@ def scrape_properties():
                     image_url=listing.get("image_url"),
                     source=listing.get("source"),
                 )
+                # Handle multiple images
+                images = listing.get("images", [])
+                if images:
+                    property_obj.set_images(images)
+                    if not property_obj.image_url and images:
+                        property_obj.image_url = images[0]
                 db.session.add(property_obj)
                 saved_count += 1
 

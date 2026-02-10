@@ -2,6 +2,27 @@
 
 {% block title %}Property Details - Real Estate Market Analyzer{% endblock %}
 
+{% block extra_css %}
+<style>
+    .carousel-inner img { max-height: 500px; object-fit: cover; }
+    .gallery-thumbnails { display: flex; gap: 10px; margin-top: 15px; overflow-x: auto; }
+    .gallery-thumbnails img { 
+        width: 80px; 
+        height: 80px; 
+        object-fit: cover; 
+        border-radius: 8px; 
+        cursor: pointer; 
+        border: 2px solid transparent; 
+        transition: all 0.3s ease;
+    }
+    .gallery-thumbnails img:hover, 
+    .gallery-thumbnails img.active { 
+        border-color: #667eea; 
+        transform: scale(1.05);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <!-- Top Bar -->
 <div class="top-bar">
@@ -14,10 +35,31 @@
 <div class="row g-4">
     <!-- Main Info -->
     <div class="col-lg-8">
+        <!-- Image Carousel -->
         <div class="card mb-4">
-            <div class="property-image" style="height: 300px;">
-                <i class="bi bi-house-fill" style="font-size: 5rem;"></i>
+            <div id="propertyCarousel" class="carousel slide" data-bs-ride="false">
+                <div class="carousel-inner" id="carouselInner">
+                    <div class="carousel-item active">
+                        <div class="property-image" style="height: 400px; background: #f0f0f0;">
+                            <i class="bi bi-image" style="font-size: 4rem; color: #ccc;"></i>
+                        </div>
+                    </div>
+                </div>
+                <button class="carousel-control-prev" type="button" data-bs-target="#propertyCarousel" data-bs-slide="prev">
+                    <span class="carousel-control-prev-icon"></span>
+                </button>
+                <button class="carousel-control-next" type="button" data-bs-target="#propertyCarousel" data-bs-slide="next">
+                    <span class="carousel-control-next-icon"></span>
+                </button>
             </div>
+            <!-- Thumbnail Gallery -->
+            <div class="card-body">
+                <div class="gallery-thumbnails" id="galleryThumbnails"></div>
+            </div>
+        </div>
+
+        <!-- Property Details Card -->
+        <div class="card mb-4">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-3">
                     <div>
@@ -147,6 +189,86 @@
                 document.getElementById('property-source').textContent = p.source || '-';
                 document.getElementById('property-date').textContent = p.scraped_at ? new Date(p.scraped_at).toLocaleDateString() : '-';
                 document.getElementById('property-id').textContent = p.id;
+                document.getElementById('property-url').href = p.url || '#';
+                
+                // Load image gallery
+                loadImageGallery(p.images || []);
+                
+                // Price per sqft
+                if (p.square_feet && p.price) {
+                    const ppsf = Math.round(p.price / p.square_feet);
+                    document.getElementById('price-per-sqft').textContent = formatPrice(ppsf) + '/sqft';
+                }
+
+                // Load city average
+                if (p.city) {
+                    fetch(`/api/market/summary?city=${encodeURIComponent(p.city)}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            const avg = data.average_price || 0;
+                            document.getElementById('city-avg').textContent = formatPrice(Math.round(avg));
+                            
+                            const diff = ((p.price - avg) / avg * 100);
+                            const bar = document.getElementById('market-comparison');
+                            
+                            if (diff > 10) {
+                                bar.style.width = '80%';
+                                bar.textContent = 'Above Average';
+                                bar.style.background = 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)';
+                            } else if (diff < -10) {
+                                bar.style.width = '30%';
+                                bar.textContent = 'Below Average';
+                                bar.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+                            } else {
+                                bar.style.width = '50%';
+                                bar.textContent = 'Average';
+                            }
+                        });
+                }
+            })
+            .catch(err => {
+                document.getElementById('property-address').textContent = 'Property Not Found';
+            });
+    }
+
+    function loadImageGallery(images) {
+        if (!images || images.length === 0) return;
+        
+        const carouselInner = document.getElementById('carouselInner');
+        const thumbnails = document.getElementById('galleryThumbnails');
+        
+        carouselInner.innerHTML = '';
+        thumbnails.innerHTML = '';
+        
+        images.forEach((img, idx) => {
+            // Add carousel item
+            const item = document.createElement('div');
+            item.className = `carousel-item ${idx === 0 ? 'active' : ''}`;
+            const imgElement = document.createElement('img');
+            imgElement.src = img;
+            imgElement.alt = `Property image ${idx + 1}`;
+            imgElement.style.width = '100%';
+            imgElement.style.height = '400px';
+            imgElement.style.objectFit = 'cover';
+            item.appendChild(imgElement);
+            carouselInner.appendChild(item);
+            
+            // Add thumbnail
+            const thumb = document.createElement('img');
+            thumb.src = img;
+            thumb.alt = `Thumbnail ${idx + 1}`;
+            thumb.className = idx === 0 ? 'active' : '';
+            thumb.onclick = () => {
+                const carousel = new bootstrap.Carousel(document.getElementById('propertyCarousel'));
+                carousel.to(idx);
+                document.querySelectorAll('.gallery-thumbnails img').forEach(t => t.classList.remove('active'));
+                thumb.classList.add('active');
+            };
+            thumbnails.appendChild(thumb);
+        });
+    }
+</script>
+{% endblock %}
                 document.getElementById('property-url').href = p.url || '#';
                 
                 // Price per sqft
