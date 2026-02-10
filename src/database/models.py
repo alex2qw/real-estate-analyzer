@@ -65,8 +65,6 @@ class Property(db.Model):
             "url": self.url,
             "scraped_at": self.scraped_at.isoformat() if self.scraped_at else None,
         }
-            "scraped_at": self.scraped_at.isoformat() if self.scraped_at else None,
-        }
 
 
 class PriceHistory(db.Model):
