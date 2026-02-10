@@ -3,6 +3,7 @@
 from flask import Blueprint, jsonify, request
 from src.database.models import Property, MarketReport
 from src.app import db
+from src.scraper.scraper import scrape_all_sources
 from sqlalchemy import func
 
 api_bp = Blueprint("api", __name__)
@@ -133,3 +134,59 @@ def get_reports():
 def health():
     """Health check endpoint."""
     return jsonify({"status": "healthy"}), 200
+
+
+@api_bp.route("/scrape", methods=["POST"])
+def scrape_properties():
+    """Trigger property scraping for a location."""
+    data = request.get_json()
+    location = data.get("location", "San Francisco")
+
+    try:
+        # Scrape listings from all sources
+        listings = scrape_all_sources(location)
+
+        if not listings:
+            return jsonify({"error": "No listings found", "location": location}), 404
+
+        # Save to database
+        saved_count = 0
+        for listing in listings:
+            # Check if property already exists
+            existing = Property.query.filter_by(url=listing.get("url")).first()
+            if not existing:
+                property_obj = Property(
+                    url=listing.get("url"),
+                    address=listing.get("address"),
+                    city=listing.get("city"),
+                    state=listing.get("state"),
+                    zip_code=listing.get("zip_code"),
+                    price=listing.get("price"),
+                    bedrooms=listing.get("bedrooms"),
+                    bathrooms=listing.get("bathrooms"),
+                    square_feet=listing.get("square_feet"),
+                    property_type=listing.get("property_type"),
+                    description=listing.get("description"),
+                    image_url=listing.get("image_url"),
+                    source=listing.get("source"),
+                )
+                db.session.add(property_obj)
+                saved_count += 1
+
+        db.session.commit()
+
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "location": location,
+                    "scraped": len(listings),
+                    "saved": saved_count,
+                    "message": f"Scraped {len(listings)} listings, saved {saved_count} new properties",
+                }
+            ),
+            200,
+        )
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
