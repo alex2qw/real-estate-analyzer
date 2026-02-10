@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - Real Estate Market Analyzer{% endblock %}
+
+{% block content %}
+<!-- Top Bar -->
+<div class="top-bar">
+    <h1><i class="bi bi-graph-up-arrow me-2"></i>Market Analytics</h1>
+    <select class="form-select" id="analyticsCity" style="width: 200px;" onchange="loadAnalytics()">
+        <option value="">All Cities</option>
+    </select>
+</div>
+
+<!-- Stats -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon primary"><i class="bi bi-buildings"></i></div>
+            <div class="stat-info">
+                <h3 id="analytics-total">0</h3>
+                <p>Properties Analyzed</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon success"><i class="bi bi-currency-dollar"></i></div>
+            <div class="stat-info">
+                <h3 id="analytics-avg">$0</h3>
+                <p>Average Price</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon warning"><i class="bi bi-calculator"></i></div>
+            <div class="stat-info">
+                <h3 id="analytics-median">$0</h3>
+                <p>Median Price</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon secondary"><i class="bi bi-house"></i></div>
+            <div class="stat-info">
+                <h3 id="analytics-avgsize">0</h3>
+                <p>Avg Sq Ft</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 1 -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-bar-chart me-2"></i>Price Distribution
+            </div>
+            <div class="card-body">
+                <div id="priceDistChart" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-pie-chart me-2"></i>Property Types
+            </div>
+            <div class="card-body">
+                <div id="typeChart" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 2 -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-geo-alt me-2"></i>Price by City
+            </div>
+            <div class="card-body">
+                <div id="cityChart" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-scatter-chart me-2"></i>Price vs Size
+            </div>
+            <div class="card-body">
+                <div id="scatterChart" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Property Type Breakdown -->
+<div class="row g-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-table me-2"></i>Market Breakdown by Type
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Property Type</th>
+                                <th>Count</th>
+                                <th>Avg Price</th>
+                                <th>Min Price</th>
+                                <th>Max Price</th>
+                                <th>Avg Sq Ft</th>
+                            </tr>
+                        </thead>
+                        <tbody id="breakdown-table">
+                            <tr>
+                                <td colspan="6" class="text-center py-4">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allProperties = [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadAnalytics();
+    });
+
+    function loadAnalytics() {
+        const city = document.getElementById('analyticsCity').value;
+        let url = '/api/properties?per_page=1000';
+        if (city) url += `&city=${encodeURIComponent(city)}`;
+
+        fetch(url)
+            .then(r => r.json())
+            .then(data => {
+                allProperties = data.properties;
+                updateStats(data.properties);
+                updateCharts(data.properties);
+                updateBreakdown(data.properties);
+                populateCityFilter(data.properties);
+            });
+    }
+
+    function updateStats(properties) {
+        if (properties.length === 0) {
+            document.getElementById('analytics-total').textContent = '0';
+            document.getElementById('analytics-avg').textContent = '$0';
+            document.getElementById('analytics-median').textContent = '$0';
+            document.getElementById('analytics-avgsize').textContent = '0';
+            return;
+        }
+
+        const prices = properties.map(p => p.price).sort((a, b) => a - b);
+        const sizes = properties.filter(p => p.square_feet).map(p => p.square_feet);
+        
+        const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+        const median = prices[Math.floor(prices.length / 2)];
+        const avgSize = sizes.length ? Math.round(sizes.reduce((a, b) => a + b, 0) / sizes.length) : 0;
+
+        document.getElementById('analytics-total').textContent = properties.length;
+        document.getElementById('analytics-avg').textContent = formatPrice(Math.round(avg));
+        document.getElementById('analytics-median').textContent = formatPrice(median);
+        document.getElementById('analytics-avgsize').textContent = avgSize.toLocaleString();
+    }
+
+    function updateCharts(properties) {
+        if (properties.length === 0) {
+            ['priceDistChart', 'typeChart', 'cityChart', 'scatterChart'].forEach(id => {
+                document.getElementById(id).innerHTML = '<p class="text-center text-muted py-5">No data available</p>';
+            });
+            return;
+        }
+
+        // Price Distribution
+        Plotly.newPlot('priceDistChart', [{
+            x: properties.map(p => p.price),
+            type: 'histogram',
+            marker: { color: 'rgba(102, 126, 234, 0.7)' },
+            nbinsx: 15
+        }], {
+            margin: { t: 20, r: 20, b: 40, l: 60 },
+            xaxis: { title: 'Price ($)' },
+            yaxis: { title: 'Count' },
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent'
+        }, { responsive: true });
+
+        // Property Types Pie
+        const typeCounts = {};
+        properties.forEach(p => {
+            const type = p.property_type || 'Unknown';
+            typeCounts[type] = (typeCounts[type] || 0) + 1;
+        });
+
+        Plotly.newPlot('typeChart', [{
+            values: Object.values(typeCounts),
+            labels: Object.keys(typeCounts),
+            type: 'pie',
+            marker: {
+                colors: ['#667eea', '#4facfe', '#fa709a', '#fee140', '#00f2fe']
+            }
+        }], {
+            margin: { t: 20, r: 20, b: 20, l: 20 },
+            paper_bgcolor: 'transparent',
+            showlegend: true
+        }, { responsive: true });
+
+        // Price by City
+        const cityPrices = {};
+        properties.forEach(p => {
+            const city = p.city || 'Unknown';
+            if (!cityPrices[city]) cityPrices[city] = [];
+            cityPrices[city].push(p.price);
+        });
+
+        const cityAvgs = Object.entries(cityPrices).map(([city, prices]) => ({
+            city,
+            avg: prices.reduce((a, b) => a + b, 0) / prices.length
+        })).sort((a, b) => b.avg - a.avg);
+
+        Plotly.newPlot('cityChart', [{
+            x: cityAvgs.map(c => c.city),
+            y: cityAvgs.map(c => c.avg),
+            type: 'bar',
+            marker: {
+                color: cityAvgs.map((_, i) => `hsl(${240 + i * 30}, 70%, 60%)`)
+            }
+        }], {
+            margin: { t: 20, r: 20, b: 80, l: 80 },
+            xaxis: { title: '' },
+            yaxis: { title: 'Average Price ($)' },
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent'
+        }, { responsive: true });
+
+        // Price vs Size Scatter
+        const validProps = properties.filter(p => p.square_feet && p.price);
+        Plotly.newPlot('scatterChart', [{
+            x: validProps.map(p => p.square_feet),
+            y: validProps.map(p => p.price),
+            mode: 'markers',
+            type: 'scatter',
+            marker: {
+                size: 10,
+                color: validProps.map(p => p.price),
+                colorscale: 'Viridis',
+                opacity: 0.7
+            },
+            text: validProps.map(p => `${p.address}<br>${formatPrice(p.price)}`)
+        }], {
+            margin: { t: 20, r: 20, b: 50, l: 80 },
+            xaxis: { title: 'Square Feet' },
+            yaxis: { title: 'Price ($)' },
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent'
+        }, { responsive: true });
+    }
+
+    function updateBreakdown(properties) {
+        const types = {};
+        properties.forEach(p => {
+            const type = p.property_type || 'Unknown';
+            if (!types[type]) types[type] = { prices: [], sizes: [] };
+            types[type].prices.push(p.price);
+            if (p.square_feet) types[type].sizes.push(p.square_feet);
+        });
+
+        const tbody = document.getElementById('breakdown-table');
+        
+        if (Object.keys(types).length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">No data available</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = Object.entries(types).map(([type, data]) => {
+            const count = data.prices.length;
+            const avg = data.prices.reduce((a, b) => a + b, 0) / count;
+            const min = Math.min(...data.prices);
+            const max = Math.max(...data.prices);
+            const avgSize = data.sizes.length ? Math.round(data.sizes.reduce((a, b) => a + b, 0) / data.sizes.length) : '-';
+
+            return `
+                <tr>
+                    <td><span class="badge badge-${type}">${type}</span></td>
+                    <td>${count}</td>
+                    <td class="text-primary fw-bold">${formatPrice(Math.round(avg))}</td>
+                    <td>${formatPrice(min)}</td>
+                    <td>${formatPrice(max)}</td>
+                    <td>${typeof avgSize === 'number' ? avgSize.toLocaleString() : avgSize}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function populateCityFilter(properties) {
+        const cities = [...new Set(properties.map(p => p.city).filter(c => c))];
+        const select = document.getElementById('analyticsCity');
+        const currentValue = select.value;
+        
+        // Clear and rebuild
+        select.innerHTML = '<option value="">All Cities</option>';
+        cities.forEach(city => {
+            const opt = new Option(city, city);
+            if (city === currentValue) opt.selected = true;
+            select.add(opt);
+        });
+    }
+</script>
+{% endblock %}

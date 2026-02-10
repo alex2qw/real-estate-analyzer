@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}Scrape Data - Real Estate Market Analyzer{% endblock %}
+
+{% block content %}
+<!-- Top Bar -->
+<div class="top-bar">
+    <h1><i class="bi bi-cloud-download-fill me-2"></i>Scrape Property Data</h1>
+</div>
+
+<div class="row g-4">
+    <!-- Scrape Form -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-search me-2"></i>New Scrape Job
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-4">Enter a location to scrape property listings. Use format: <code>City, Country</code> or <code>City, State</code></p>
+                
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Location</label>
+                    <input type="text" class="form-control form-control-lg" id="scrapeLocation" 
+                           placeholder="e.g., London, UK or San Francisco, USA" value="San Francisco, USA">
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Quick Select</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="btn btn-outline-primary btn-sm" onclick="setLocation('New York, USA')">New York</button>
+                        <button class="btn btn-outline-primary btn-sm" onclick="setLocation('London, UK')">London</button>
+                        <button class="btn btn-outline-primary btn-sm" onclick="setLocation('Tokyo, Japan')">Tokyo</button>
+                        <button class="btn btn-outline-primary btn-sm" onclick="setLocation('Paris, France')">Paris</button>
+                        <button class="btn btn-outline-primary btn-sm" onclick="setLocation('Sydney, Australia')">Sydney</button>
+                        <button class="btn btn-outline-primary btn-sm" onclick="setLocation('Dubai, UAE')">Dubai</button>
+                        <button class="btn btn-outline-primary btn-sm" onclick="setLocation('Toronto, Canada')">Toronto</button>
+                        <button class="btn btn-outline-primary btn-sm" onclick="setLocation('Singapore')">Singapore</button>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-lg w-100" onclick="startScrape()" id="scrapeBtn">
+                    <i class="bi bi-cloud-download"></i> Start Scraping
+                </button>
+
+                <div id="scrapeResult" class="mt-4"></div>
+            </div>
+        </div>
+
+        <!-- Recent Scrapes -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="bi bi-clock-history me-2"></i>Scrape History
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush" id="scrapeHistory">
+                    <li class="list-group-item text-center text-muted py-3">No scrapes yet</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info & Stats -->
+    <div class="col-lg-6">
+        <!-- Current Stats -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-database me-2"></i>Database Stats
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <h2 id="dbTotal" class="text-primary">0</h2>
+                        <p class="text-muted mb-0">Properties</p>
+                    </div>
+                    <div class="col-4">
+                        <h2 id="dbCities" class="text-success">0</h2>
+                        <p class="text-muted mb-0">Cities</p>
+                    </div>
+                    <div class="col-4">
+                        <h2 id="dbSources" class="text-warning">0</h2>
+                        <p class="text-muted mb-0">Sources</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Sources -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-diagram-3 me-2"></i>Available Data Sources
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3 p-3 bg-light rounded">
+                    <i class="bi bi-check-circle-fill text-success fs-4 me-3"></i>
+                    <div>
+                        <strong>Demo Data</strong>
+                        <p class="text-muted mb-0 small">Sample listings for testing</p>
+                    </div>
+                    <span class="badge bg-success ms-auto">Active</span>
+                </div>
+                <div class="d-flex align-items-center mb-3 p-3 bg-light rounded">
+                    <i class="bi bi-clock-fill text-warning fs-4 me-3"></i>
+                    <div>
+                        <strong>Zillow</strong>
+                        <p class="text-muted mb-0 small">Real estate listings</p>
+                    </div>
+                    <span class="badge bg-warning ms-auto">Coming Soon</span>
+                </div>
+                <div class="d-flex align-items-center p-3 bg-light rounded">
+                    <i class="bi bi-clock-fill text-warning fs-4 me-3"></i>
+                    <div>
+                        <strong>Redfin</strong>
+                        <p class="text-muted mb-0 small">Property marketplace</p>
+                    </div>
+                    <span class="badge bg-warning ms-auto">Coming Soon</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tips -->
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-lightbulb me-2"></i>Tips
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li class="mb-2">Use <code>City, Country</code> format for international locations</li>
+                    <li class="mb-2">Use <code>City, State</code> format for US locations</li>
+                    <li class="mb-2">Each scrape adds 5 demo properties to the database</li>
+                    <li class="mb-2">Properties with the same URL won't be duplicated</li>
+                    <li>View scraped data in the <a href="/properties">Properties</a> page</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let scrapeHistory = [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadDbStats();
+    });
+
+    function setLocation(location) {
+        document.getElementById('scrapeLocation').value = location;
+    }
+
+    function loadDbStats() {
+        fetch('/api/properties?per_page=1000')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('dbTotal').textContent = data.total;
+                
+                const cities = [...new Set(data.properties.map(p => p.city).filter(c => c))];
+                document.getElementById('dbCities').textContent = cities.length;
+                
+                const sources = [...new Set(data.properties.map(p => p.source).filter(s => s))];
+                document.getElementById('dbSources').textContent = sources.length;
+            });
+    }
+
+    function startScrape() {
+        const location = document.getElementById('scrapeLocation').value.trim();
+        if (!location) {
+            alert('Please enter a location');
+            return;
+        }
+
+        const btn = document.getElementById('scrapeBtn');
+        const resultDiv = document.getElementById('scrapeResult');
+        
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Scraping...';
+        resultDiv.innerHTML = '';
+
+        fetch('/api/scrape', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ location: location })
+        })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-cloud-download"></i> Start Scraping';
+
+            if (data.success) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <h5><i class="bi bi-check-circle me-2"></i>Scraping Complete!</h5>
+                        <p class="mb-0">
+                            Location: <strong>${data.location}</strong><br>
+                            Properties Found: <strong>${data.scraped}</strong><br>
+                            New Properties Saved: <strong>${data.saved}</strong>
+                        </p>
+                    </div>
+                `;
+                
+                // Add to history
+                addToHistory(location, data.scraped, data.saved);
+                loadDbStats();
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <h5><i class="bi bi-x-circle me-2"></i>Scraping Failed</h5>
+                        <p class="mb-0">${data.error || 'Unknown error'}</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-cloud-download"></i> Start Scraping';
+            resultDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <h5><i class="bi bi-x-circle me-2"></i>Error</h5>
+                    <p class="mb-0">${err.message}</p>
+                </div>
+            `;
+        });
+    }
+
+    function addToHistory(location, found, saved) {
+        const time = new Date().toLocaleTimeString();
+        scrapeHistory.unshift({ location, found, saved, time });
+        
+        // Keep only last 5
+        if (scrapeHistory.length > 5) scrapeHistory.pop();
+        
+        updateHistoryUI();
+    }
+
+    function updateHistoryUI() {
+        const list = document.getElementById('scrapeHistory');
+        
+        if (scrapeHistory.length === 0) {
+            list.innerHTML = '<li class="list-group-item text-center text-muted py-3">No scrapes yet</li>';
+            return;
+        }
+
+        list.innerHTML = scrapeHistory.map(h => `
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>${h.location}</strong>
+                    <small class="text-muted d-block">${h.time}</small>
+                </div>
+                <div class="text-end">
+                    <span class="badge bg-primary">${h.found} found</span>
+                    <span class="badge bg-success">${h.saved} saved</span>
+                </div>
+            </li>
+        `).join('');
+    }
+</script>
+{% endblock %}

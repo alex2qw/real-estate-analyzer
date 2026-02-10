@@ -139,10 +139,14 @@ def health():
 @api_bp.route("/scrape", methods=["POST"])
 def scrape_properties():
     """Trigger property scraping for a location."""
-    data = request.get_json()
-    location = data.get("location", "San Francisco")
-
     try:
+        data = request.get_json() or {}
+        location = data.get("location") or request.form.get("location") or "San Francisco"
+        
+        # Validate location
+        if not location or not isinstance(location, str):
+            location = "San Francisco"
+
         # Scrape listings from all sources
         listings = scrape_all_sources(location)
 

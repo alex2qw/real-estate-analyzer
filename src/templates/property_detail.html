@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Property Details - Real Estate Market Analyzer{% endblock %}
+
+{% block content %}
+<!-- Top Bar -->
+<div class="top-bar">
+    <h1><i class="bi bi-house-fill me-2"></i>Property Details</h1>
+    <a href="/properties" class="btn btn-outline-primary">
+        <i class="bi bi-arrow-left"></i> Back to Properties
+    </a>
+</div>
+
+<div class="row g-4">
+    <!-- Main Info -->
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="property-image" style="height: 300px;">
+                <i class="bi bi-house-fill" style="font-size: 5rem;"></i>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h2 class="mb-1" id="property-address">Loading...</h2>
+                        <p class="text-muted mb-0" id="property-location"></p>
+                    </div>
+                    <h2 class="text-primary" id="property-price">$0</h2>
+                </div>
+                
+                <hr>
+                
+                <div class="row text-center py-3">
+                    <div class="col-md-3">
+                        <h4 id="property-beds">-</h4>
+                        <p class="text-muted mb-0"><i class="bi bi-door-open"></i> Bedrooms</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 id="property-baths">-</h4>
+                        <p class="text-muted mb-0"><i class="bi bi-droplet"></i> Bathrooms</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 id="property-sqft">-</h4>
+                        <p class="text-muted mb-0"><i class="bi bi-arrows-angle-expand"></i> Sq Ft</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 id="property-type">-</h4>
+                        <p class="text-muted mb-0"><i class="bi bi-building"></i> Type</p>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <h5 class="mb-3">Description</h5>
+                <p id="property-description" class="text-muted">No description available.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Price Analysis -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-graph-up me-2"></i>Price Analysis
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <small class="text-muted">Price per Sq Ft</small>
+                    <h4 id="price-per-sqft">$0</h4>
+                </div>
+                <div class="mb-3">
+                    <small class="text-muted">Market Comparison</small>
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar" id="market-comparison" role="progressbar" style="width: 50%; background: var(--primary-gradient);">
+                            Average
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <small class="text-muted">City Average</small>
+                    <h4 id="city-avg">$0</h4>
+                </div>
+            </div>
+        </div>
+
+        <!-- Property Info -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-info-circle me-2"></i>Property Info
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li class="d-flex justify-content-between py-2 border-bottom">
+                        <span class="text-muted">Source</span>
+                        <strong id="property-source">-</strong>
+                    </li>
+                    <li class="d-flex justify-content-between py-2 border-bottom">
+                        <span class="text-muted">Listed</span>
+                        <strong id="property-date">-</strong>
+                    </li>
+                    <li class="d-flex justify-content-between py-2">
+                        <span class="text-muted">ID</span>
+                        <strong id="property-id">-</strong>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card">
+            <div class="card-body">
+                <a href="#" class="btn btn-primary w-100 mb-2" id="property-url" target="_blank">
+                    <i class="bi bi-box-arrow-up-right"></i> View Original Listing
+                </a>
+                <button class="btn btn-outline-primary w-100" onclick="window.print()">
+                    <i class="bi bi-printer"></i> Print Details
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const pathParts = window.location.pathname.split('/');
+        const propertyId = pathParts[pathParts.length - 1];
+        loadProperty(propertyId);
+    });
+
+    function loadProperty(id) {
+        fetch(`/api/properties/${id}`)
+            .then(r => {
+                if (!r.ok) throw new Error('Property not found');
+                return r.json();
+            })
+            .then(p => {
+                document.getElementById('property-address').textContent = p.address || 'Address N/A';
+                document.getElementById('property-location').textContent = `${p.city || ''}, ${p.state || ''}`;
+                document.getElementById('property-price').textContent = formatPrice(p.price);
+                document.getElementById('property-beds').textContent = p.bedrooms || '-';
+                document.getElementById('property-baths').textContent = p.bathrooms || '-';
+                document.getElementById('property-sqft').textContent = p.square_feet ? p.square_feet.toLocaleString() : '-';
+                document.getElementById('property-type').textContent = p.property_type || '-';
+                document.getElementById('property-description').textContent = p.description || 'No description available.';
+                document.getElementById('property-source').textContent = p.source || '-';
+                document.getElementById('property-date').textContent = p.scraped_at ? new Date(p.scraped_at).toLocaleDateString() : '-';
+                document.getElementById('property-id').textContent = p.id;
+                document.getElementById('property-url').href = p.url || '#';
+                
+                // Price per sqft
+                if (p.square_feet && p.price) {
+                    const ppsf = Math.round(p.price / p.square_feet);
+                    document.getElementById('price-per-sqft').textContent = formatPrice(ppsf) + '/sqft';
+                }
+
+                // Load city average
+                if (p.city) {
+                    fetch(`/api/market/summary?city=${encodeURIComponent(p.city)}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            const avg = data.average_price || 0;
+                            document.getElementById('city-avg').textContent = formatPrice(Math.round(avg));
+                            
+                            // Market comparison
+                            const diff = ((p.price - avg) / avg * 100);
+                            const bar = document.getElementById('market-comparison');
+                            
+                            if (diff > 10) {
+                                bar.style.width = '80%';
+                                bar.textContent = 'Above Average';
+                                bar.style.background = 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)';
+                            } else if (diff < -10) {
+                                bar.style.width = '30%';
+                                bar.textContent = 'Below Average';
+                                bar.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+                            } else {
+                                bar.style.width = '50%';
+                                bar.textContent = 'Average';
+                            }
+                        });
+                }
+            })
+            .catch(err => {
+                document.getElementById('property-address').textContent = 'Property Not Found';
+            });
+    }
+</script>
+{% endblock %}

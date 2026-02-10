@@ -2,267 +2,113 @@
 
 {% block title %}Dashboard - Real Estate Market Analyzer{% endblock %}
 
-{% block extra_css %}
-<style>
-    .stat-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 15px;
-        padding: 2rem;
-        text-align: center;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-    }
-    .stat-card h3 {
-        font-size: 2.5rem;
-        font-weight: bold;
-        margin: 0;
-    }
-    .stat-card p {
-        font-size: 1rem;
-        margin: 0.5rem 0 0 0;
-        opacity: 0.9;
-    }
-    .hero {
-        background: rgba(255, 255, 255, 0.95);
-        border-radius: 15px;
-        padding: 3rem;
-        margin-bottom: 2rem;
-        text-align: center;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-    }
-    .hero h1 {
-        color: #667eea;
-        margin-bottom: 1rem;
-    }
-    .hero p {
-        font-size: 1.1rem;
-        color: #666;
-    }
-    .feature-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1.5rem;
-        margin-bottom: 2rem;
-    }
-    .feature-card {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        transition: transform 0.3s ease;
-    }
-    .feature-card:hover {
-        transform: translateY(-5px);
-    }
-    .feature-icon {
-        font-size: 2.5rem;
-        margin-bottom: 1rem;
-    }
-    .loading {
-        display: none;
-    }
-    .loading.show {
-        display: block;
-    }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="container-fluid">
-    <!-- Hero Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="hero">
-                <h1>🏘️ Real Estate Market Analyzer</h1>
-                <p>Scrape property listings, analyze price trends, and generate market reports with visualizations</p>
-            </div>
-        </div>
+<!-- Top Bar -->
+<div class="top-bar">
+    <h1><i class="bi bi-grid-1x2-fill me-2"></i>Dashboard</h1>
+    <div class="d-flex gap-2">
+        <a href="/properties" class="btn btn-outline-primary">View Properties</a>
+        <a href="/scrape" class="btn btn-primary"><i class="bi bi-cloud-download"></i> Scrape Data</a>
     </div>
+</div>
 
-    <!-- Scraping Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">🕷️ Scrape Properties</h4>
-                </div>
-                <div class="card-body">
-                    <p>Click the button below to scrape property listings for a location and populate the database.</p>
-                    <div class="input-group mb-3">
-                        <input 
-                            type="text" 
-                            class="form-control" 
-                            id="scrape-location" 
-                            placeholder="Enter location (e.g., San Francisco)" 
-                            value="San Francisco"
-                        >
-                        <button 
-                            class="btn btn-primary" 
-                            type="button" 
-                            onclick="scrapeProperties()"
-                        >
-                            Scrape Now
-                        </button>
-                    </div>
-                    <div id="scrape-status" style="display: none;">
-                        <div class="alert" id="scrape-alert"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-        <div class="col-md-4">
-            <div class="stat-card">
-                <h3 id="total-properties">-</h3>
+<!-- Stats Row -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon primary"><i class="bi bi-buildings"></i></div>
+            <div class="stat-info">
+                <h3 id="total-properties">0</h3>
                 <p>Total Properties</p>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="stat-card">
-                <h3 id="avg-price">-</h3>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon success"><i class="bi bi-currency-dollar"></i></div>
+            <div class="stat-info">
+                <h3 id="avg-price">$0</h3>
                 <p>Average Price</p>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="stat-card">
-                <h3 id="api-status">✓</h3>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon warning"><i class="bi bi-geo-alt"></i></div>
+            <div class="stat-info">
+                <h3 id="total-cities">0</h3>
+                <p>Cities Covered</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon secondary"><i class="bi bi-check-circle"></i></div>
+            <div class="stat-info">
+                <h3 id="api-status">Online</h3>
                 <p>API Status</p>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Features Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <h2 style="color: white; margin-bottom: 2rem;">Key Features</h2>
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">🕷️</div>
-                    <h4>Web Scraping</h4>
-                    <p>Automatically scrape property listings from multiple real estate sources</p>
+<!-- Quick Actions & Chart -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-cloud-download me-2"></i>Quick Scrape</div>
+            <div class="card-body">
+                <p class="text-muted mb-3">Add new property listings to your database</p>
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="scrape-location" placeholder="Enter location..." value="San Francisco, USA">
+                    <button class="btn btn-primary" onclick="quickScrape()"><i class="bi bi-download"></i></button>
                 </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📊</div>
-                    <h4>Price Analysis</h4>
-                    <p>Track and analyze price trends over time with detailed statistics</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📈</div>
-                    <h4>Market Reports</h4>
-                    <p>Generate comprehensive market analysis reports by location</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📉</div>
-                    <h4>Visualizations</h4>
-                    <p>Interactive Plotly charts showing trends and comparisons</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🔍</div>
-                    <h4>Market Metrics</h4>
-                    <p>KPIs including average prices, market heat, and anomalies</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🚀</div>
-                    <h4>REST API</h4>
-                    <p>Access market data programmatically with our full-featured API</p>
-                </div>
+                <div id="scrape-result"></div>
             </div>
         </div>
     </div>
-
-    <!-- API Testing Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">API Endpoints</h4>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Endpoint</th>
-                                    <th>Method</th>
-                                    <th>Description</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td><code>/api/health</code></td>
-                                    <td><span class="badge bg-success">GET</span></td>
-                                    <td>Health check</td>
-                                    <td><button class="btn btn-sm btn-primary" onclick="testEndpoint('/api/health')">Test</button></td>
-                                </tr>
-                                <tr>
-                                    <td><code>/api/properties</code></td>
-                                    <td><span class="badge bg-success">GET</span></td>
-                                    <td>Get all properties</td>
-                                    <td><button class="btn btn-sm btn-primary" onclick="testEndpoint('/api/properties')">Test</button></td>
-                                </tr>
-                                <tr>
-                                    <td><code>/api/market/summary</code></td>
-                                    <td><span class="badge bg-success">GET</span></td>
-                                    <td>Market summary</td>
-                                    <td><button class="btn btn-sm btn-primary" onclick="testEndpoint('/api/market/summary')">Test</button></td>
-                                </tr>
-                                <tr>
-                                    <td><code>/api/reports</code></td>
-                                    <td><span class="badge bg-success">GET</span></td>
-                                    <td>Market reports</td>
-                                    <td><button class="btn btn-sm btn-primary" onclick="testEndpoint('/api/reports')">Test</button></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-bar-chart me-2"></i>Price Distribution</div>
+            <div class="card-body">
+                <div id="priceChart" style="height: 250px;"></div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Response Display -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card" id="response-card" style="display: none;">
-                <div class="card-header bg-dark text-white">
-                    <h5 class="mb-0">API Response</h5>
-                </div>
-                <div class="card-body">
-                    <pre id="response-body" style="max-height: 400px; overflow-y: auto;"><code></code></pre>
-                </div>
+<!-- Recent Properties -->
+<div class="row g-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-clock-history me-2"></i>Recent Properties</span>
+                <a href="/properties" class="btn btn-sm btn-light">View All</a>
             </div>
-        </div>
-    </div>
-
-    <!-- Quick Links -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">Quick Links</h4>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h5>📚 Documentation</h5>
-                            <ul>
-                                <li><a href="https://github.com/alex2qw/real-estate-analyzer" target="_blank">GitHub Repository</a></li>
-                                <li><a href="https://github.com/alex2qw/real-estate-analyzer/blob/main/QUICKSTART.md" target="_blank">Quick Start Guide</a></li>
-                                <li><a href="https://github.com/alex2qw/real-estate-analyzer/blob/main/README.md" target="_blank">Full Documentation</a></li>
-                            </ul>
-                        </div>
-                        <div class="col-md-6">
-                            <h5>🛠️ Development</h5>
-                            <ul>
-                                <li>Run tests: <code>make test</code></li>
-                                <li>Format code: <code>make format</code></li>
-                                <li>Lint: <code>make lint</code></li>
-                                <li>View coverage: Open <code>htmlcov/index.html</code></li>
-                            </ul>
-                        </div>
-                    </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Address</th>
+                                <th>City</th>
+                                <th>Price</th>
+                                <th>Type</th>
+                                <th>Beds</th>
+                                <th>Baths</th>
+                                <th>Sqft</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-properties">
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">
+                                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                    No properties yet. Click "Scrape Data" to add some!
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -272,115 +118,97 @@
 
 {% block extra_js %}
 <script>
-    // Load statistics on page load
     document.addEventListener('DOMContentLoaded', function() {
-        loadStats();
-        checkApiHealth();
+        loadDashboardData();
     });
 
-    function loadStats() {
-        // Get properties count
-        fetch('/api/properties')
-            .then(response => response.json())
+    function loadDashboardData() {
+        fetch('/api/properties?per_page=10')
+            .then(r => r.json())
             .then(data => {
-                document.getElementById('total-properties').textContent = data.total || 0;
-            })
-            .catch(error => console.error('Error:', error));
+                document.getElementById('total-properties').textContent = data.total;
+                updateRecentProperties(data.properties);
+                updatePriceChart(data.properties);
+                const cities = [...new Set(data.properties.map(p => p.city))];
+                document.getElementById('total-cities').textContent = cities.length;
+            });
 
-        // Get market summary
         fetch('/api/market/summary')
-            .then(response => response.json())
+            .then(r => r.json())
             .then(data => {
-                const avgPrice = data.average_price ? `$${Math.round(data.average_price).toLocaleString()}` : 'N/A';
-                document.getElementById('avg-price').textContent = avgPrice;
-            })
-            .catch(error => console.error('Error:', error));
-    }
+                const avg = data.average_price ? formatPrice(Math.round(data.average_price)) : '$0';
+                document.getElementById('avg-price').textContent = avg;
+            });
 
-    function checkApiHealth() {
         fetch('/api/health')
-            .then(response => response.json())
+            .then(r => r.json())
             .then(data => {
-                if (data.status === 'healthy') {
-                    document.getElementById('api-status').textContent = '✓ Online';
-                } else {
-                    document.getElementById('api-status').textContent = '✗ Offline';
-                }
-            })
-            .catch(error => {
-                document.getElementById('api-status').textContent = '✗ Error';
-                console.error('Error:', error);
+                document.getElementById('api-status').innerHTML = 
+                    data.status === 'healthy' ? '<span class="text-success">Online</span>' : '<span class="text-danger">Offline</span>';
             });
     }
 
-    function testEndpoint(endpoint) {
-        const responseCard = document.getElementById('response-card');
-        const responseBody = document.getElementById('response-body').querySelector('code');
-
-        fetch(endpoint)
-            .then(response => response.json())
-            .then(data => {
-                responseBody.textContent = JSON.stringify(data, null, 2);
-                responseCard.style.display = 'block';
-                responseCard.scrollIntoView({ behavior: 'smooth' });
-            })
-            .catch(error => {
-                responseBody.textContent = 'Error: ' + error.message;
-                responseCard.style.display = 'block';
-                responseCard.scrollIntoView({ behavior: 'smooth' });
-            });
+    function updateRecentProperties(properties) {
+        const tbody = document.getElementById('recent-properties');
+        if (properties.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted py-4">
+                <i class="bi bi-inbox fs-1 d-block mb-2"></i>No properties yet. Click "Scrape Data" to add some!</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = properties.slice(0, 10).map(p => `
+            <tr>
+                <td><strong>${p.address || 'N/A'}</strong></td>
+                <td>${p.city || 'N/A'}, ${p.state || ''}</td>
+                <td class="text-primary fw-bold">${formatPrice(p.price)}</td>
+                <td><span class="badge badge-${p.property_type || 'house'}">${p.property_type || 'N/A'}</span></td>
+                <td><i class="bi bi-door-open"></i> ${p.bedrooms || '-'}</td>
+                <td><i class="bi bi-droplet"></i> ${p.bathrooms || '-'}</td>
+                <td>${p.square_feet ? p.square_feet.toLocaleString() : '-'}</td>
+                <td><a href="/property/${p.id}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a></td>
+            </tr>
+        `).join('');
     }
 
-    // Refresh stats every 30 seconds
-    setInterval(loadStats, 30000);
-    setInterval(checkApiHealth, 30000);
+    function updatePriceChart(properties) {
+        if (properties.length === 0) {
+            document.getElementById('priceChart').innerHTML = '<p class="text-center text-muted py-5">No data available</p>';
+            return;
+        }
+        Plotly.newPlot('priceChart', [{
+            x: properties.map(p => p.price),
+            type: 'histogram',
+            marker: { color: 'rgba(102, 126, 234, 0.7)', line: { color: 'rgba(102, 126, 234, 1)', width: 1 } },
+            nbinsx: 10
+        }], {
+            margin: { t: 20, r: 20, b: 40, l: 60 },
+            xaxis: { title: 'Price ($)' },
+            yaxis: { title: 'Count' },
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent'
+        }, { responsive: true });
+    }
 
-    function scrapeProperties() {
-        const location = document.getElementById('scrape-location').value || 'San Francisco';
-        const statusDiv = document.getElementById('scrape-status');
-        const alertDiv = document.getElementById('scrape-alert');
-        const button = event.target;
-
-        // Show loading state
-        button.disabled = true;
-        button.textContent = 'Scraping...';
-        statusDiv.style.display = 'none';
-
+    function quickScrape() {
+        const location = document.getElementById('scrape-location').value;
+        const resultDiv = document.getElementById('scrape-result');
+        resultDiv.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass-split"></i> Scraping...</div>';
+        
         fetch('/api/scrape', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ location: location })
         })
-        .then(response => response.json())
+        .then(r => r.json())
         .then(data => {
-            button.disabled = false;
-            button.textContent = 'Scrape Now';
-            statusDiv.style.display = 'block';
-
             if (data.success) {
-                alertDiv.className = 'alert alert-success';
-                alertDiv.innerHTML = `
-                    <strong>✓ Scraping Complete!</strong><br>
-                    Scraped: ${data.scraped} listings<br>
-                    Saved: ${data.saved} new properties<br>
-                    Location: ${data.location}
-                `;
+                resultDiv.innerHTML = `<div class="alert alert-success"><i class="bi bi-check-circle"></i> Scraped ${data.scraped}, saved ${data.saved} new!</div>`;
+                loadDashboardData();
             } else {
-                alertDiv.className = 'alert alert-danger';
-                alertDiv.innerHTML = `<strong>✗ Error:</strong> ${data.error || 'Unknown error'}`;
+                resultDiv.innerHTML = `<div class="alert alert-danger"><i class="bi bi-x-circle"></i> ${data.error}</div>`;
             }
-
-            // Refresh statistics
-            setTimeout(loadStats, 500);
         })
-        .catch(error => {
-            button.disabled = false;
-            button.textContent = 'Scrape Now';
-            statusDiv.style.display = 'block';
-            alertDiv.className = 'alert alert-danger';
-            alertDiv.innerHTML = `<strong>✗ Error:</strong> ${error.message}`;
+        .catch(err => {
+            resultDiv.innerHTML = `<div class="alert alert-danger"><i class="bi bi-x-circle"></i> ${err.message}</div>`;
         });
     }
 </script>

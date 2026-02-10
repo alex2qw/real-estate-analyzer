@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}Properties - Real Estate Market Analyzer{% endblock %}
+
+{% block content %}
+<!-- Top Bar -->
+<div class="top-bar">
+    <h1><i class="bi bi-buildings-fill me-2"></i>Properties</h1>
+    <div class="d-flex gap-2">
+        <select class="form-select" id="filterCity" style="width: 200px;">
+            <option value="">All Cities</option>
+        </select>
+        <select class="form-select" id="filterType" style="width: 150px;">
+            <option value="">All Types</option>
+            <option value="house">House</option>
+            <option value="condo">Condo</option>
+            <option value="apartment">Apartment</option>
+        </select>
+        <button class="btn btn-primary" onclick="applyFilters()">
+            <i class="bi bi-funnel"></i> Filter
+        </button>
+    </div>
+</div>
+
+<!-- Property Stats -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon primary"><i class="bi bi-buildings"></i></div>
+            <div class="stat-info">
+                <h3 id="stat-total">0</h3>
+                <p>Total Properties</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon success"><i class="bi bi-currency-dollar"></i></div>
+            <div class="stat-info">
+                <h3 id="stat-avg">$0</h3>
+                <p>Average Price</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon warning"><i class="bi bi-arrow-down-circle"></i></div>
+            <div class="stat-info">
+                <h3 id="stat-min">$0</h3>
+                <p>Lowest Price</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-icon secondary"><i class="bi bi-arrow-up-circle"></i></div>
+            <div class="stat-info">
+                <h3 id="stat-max">$0</h3>
+                <p>Highest Price</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Properties Grid -->
+<div class="row g-4" id="properties-grid">
+    <div class="col-12 text-center py-5">
+        <div class="spinner-border text-light" role="status"></div>
+        <p class="text-white mt-3">Loading properties...</p>
+    </div>
+</div>
+
+<!-- Pagination -->
+<div class="d-flex justify-content-center mt-4" id="pagination"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentPage = 1;
+    let allProperties = [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadProperties();
+    });
+
+    function loadProperties(page = 1) {
+        const city = document.getElementById('filterCity').value;
+        const type = document.getElementById('filterType').value;
+        
+        let url = `/api/properties?page=${page}&per_page=12`;
+        if (city) url += `&city=${encodeURIComponent(city)}`;
+        if (type) url += `&property_type=${encodeURIComponent(type)}`;
+
+        fetch(url)
+            .then(r => r.json())
+            .then(data => {
+                allProperties = data.properties;
+                updateStats(data.properties);
+                renderProperties(data.properties);
+                renderPagination(data.pages, page);
+                populateCityFilter(data.properties);
+            });
+    }
+
+    function updateStats(properties) {
+        document.getElementById('stat-total').textContent = properties.length;
+        
+        if (properties.length > 0) {
+            const prices = properties.map(p => p.price);
+            const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+            const min = Math.min(...prices);
+            const max = Math.max(...prices);
+            
+            document.getElementById('stat-avg').textContent = formatPrice(Math.round(avg));
+            document.getElementById('stat-min').textContent = formatPrice(min);
+            document.getElementById('stat-max').textContent = formatPrice(max);
+        }
+    }
+
+    function renderProperties(properties) {
+        const grid = document.getElementById('properties-grid');
+        
+        if (properties.length === 0) {
+            grid.innerHTML = `
+                <div class="col-12">
+                    <div class="card p-5 text-center">
+                        <i class="bi bi-inbox fs-1 text-muted mb-3"></i>
+                        <h4>No properties found</h4>
+                        <p class="text-muted">Try adjusting your filters or scrape new data</p>
+                        <a href="/scrape" class="btn btn-primary mt-3">
+                            <i class="bi bi-cloud-download"></i> Scrape Properties
+                        </a>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        grid.innerHTML = properties.map(p => `
+            <div class="col-lg-4 col-md-6">
+                <div class="property-card">
+                    <div class="property-image">
+                        <i class="bi bi-house-fill"></i>
+                    </div>
+                    <div class="property-info">
+                        <div class="property-price">${formatPrice(p.price)}</div>
+                        <div class="property-address">${p.address || 'Address N/A'}</div>
+                        <div class="property-city">${p.city || ''}, ${p.state || ''}</div>
+                        <div class="property-features">
+                            <span><i class="bi bi-door-open"></i> ${p.bedrooms || '-'} beds</span>
+                            <span><i class="bi bi-droplet"></i> ${p.bathrooms || '-'} baths</span>
+                            <span><i class="bi bi-arrows-angle-expand"></i> ${p.square_feet ? p.square_feet.toLocaleString() : '-'} sqft</span>
+                        </div>
+                        <div class="mt-3 d-flex gap-2">
+                            <a href="/property/${p.id}" class="btn btn-primary flex-grow-1">
+                                <i class="bi bi-eye"></i> View Details
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function renderPagination(totalPages, currentPage) {
+        const pagination = document.getElementById('pagination');
+        
+        if (totalPages <= 1) {
+            pagination.innerHTML = '';
+            return;
+        }
+
+        let html = '<nav><ul class="pagination">';
+        
+        for (let i = 1; i <= totalPages; i++) {
+            html += `
+                <li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="loadProperties(${i}); return false;">${i}</a>
+                </li>
+            `;
+        }
+        
+        html += '</ul></nav>';
+        pagination.innerHTML = html;
+    }
+
+    function populateCityFilter(properties) {
+        const cities = [...new Set(properties.map(p => p.city).filter(c => c))];
+        const select = document.getElementById('filterCity');
+        
+        // Keep existing options and add new ones
+        cities.forEach(city => {
+            if (!Array.from(select.options).some(opt => opt.value === city)) {
+                select.add(new Option(city, city));
+            }
+        });
+    }
+
+    function applyFilters() {
+        loadProperties(1);
+    }
+</script>
+{% endblock %}

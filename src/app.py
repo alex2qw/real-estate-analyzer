@@ -31,8 +31,28 @@ def create_app(config_name="development"):
     # Routes
     @app.route("/")
     def index():
-        """Home page."""
+        """Dashboard home page."""
         return render_template("index.html")
+
+    @app.route("/properties")
+    def properties_page():
+        """Properties listing page."""
+        return render_template("properties.html")
+
+    @app.route("/property/<int:property_id>")
+    def property_detail(property_id):
+        """Property detail page."""
+        return render_template("property_detail.html")
+
+    @app.route("/analytics")
+    def analytics_page():
+        """Analytics and charts page."""
+        return render_template("analytics.html")
+
+    @app.route("/scrape")
+    def scrape_page():
+        """Scrape data page."""
+        return render_template("scrape.html")
 
     @app.route("/health")
     def health():
