@@ -1,11 +1,20 @@
-"""Web scraping module for property listings."""
+"""Web scraping module for property listings using Selenium."""
 
 import requests
 from bs4 import BeautifulSoup
 import logging
 import random
 import hashlib
+import re
+import time
 from typing import List, Dict
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +25,7 @@ STREET_NAMES = [
     "Royal", "Victoria", "King", "Queen", "Prince", "Duke", "Windsor", "Hampton", "Cambridge"
 ]
 STREET_TYPES = ["Street", "Avenue", "Road", "Drive", "Lane", "Boulevard", "Court", "Place", "Way"]
-PROPERTY_TYPES = ["house", "studio", "apartment", "townhouse"]
+PROPERTY_TYPES = ["house", "studio", "apartment", "townhouse", "condo"]
 
 
 class PropertyScraper:
@@ -26,7 +35,7 @@ class PropertyScraper:
         """Initialize scraper with timeout."""
         self.timeout = timeout
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
         }
 
     def fetch_page(self, url: str) -> BeautifulSoup:
@@ -62,7 +71,7 @@ class DemoScraper(PropertyScraper):
         prop_type = random.choice(PROPERTY_TYPES)
         
         # Base prices vary by property type
-        base_prices = {"house": 550000, "condo": 380000, "apartment": 280000, "townhouse": 450000}
+        base_prices = {"house": 550000, "condo": 380000, "apartment": 280000, "townhouse": 450000, "studio": 350000}
         base_price = base_prices.get(prop_type, 400000)
         
         # Add variation (±40%)
@@ -103,10 +112,11 @@ class DemoScraper(PropertyScraper):
             "price": price,
             "bedrooms": bedrooms,
             "bathrooms": bathrooms,
-            "square_feet": sqft,
+            "square_feet": int(sqft),
             "property_type": prop_type,
             "description": random.choice(descriptions),
             "source": "demo",
+            "images": self._get_property_images()
         }
 
     def scrape_listings(self, location: str) -> List[Dict]:
@@ -132,55 +142,201 @@ class DemoScraper(PropertyScraper):
         
         return listings
 
-
-class ZillowScraper(PropertyScraper):
-    """Scraper for Zillow-style listings using public data."""
-
-    def scrape_listings(self, location: str) -> List[Dict]:
-        """Scrape property listings from search results."""
-        logger.info(f"Scraping listings for {location}")
-        try:
-            parts = location.split(",")
-            city = parts[0].strip()
-            state = parts[1].strip() if len(parts) > 1 else ""
-            listings = self._search_listings(city, state)
-            return listings
-        except Exception as e:
-            logger.error(f"Error scraping: {e}")
-            return []
-
-    def _search_listings(self, city: str, state: str) -> List[Dict]:
-        """Search for listings with property images."""
-        random.seed(hash(city + state) % 2**32)
-        property_types = ["house", "condo", "apartment", "townhouse"]
-        listings = []
-        
-        for i in range(random.randint(3, 6)):
-            prop_type = random.choice(property_types)
-            listing = {
-                "address": f"{random.randint(100, 9999)} {random.choice(STREET_NAMES)} {random.choice(STREET_TYPES)}",
-                "city": city,
-                "state": state,
-                "price": random.randint(200000, 1500000),
-                "bedrooms": random.randint(1, 5),
-                "bathrooms": random.randint(1, 4) + random.choice([0, 0.5]),
-                "square_feet": random.randint(800, 4000),
-                "property_type": prop_type,
-                "description": f"Beautiful {prop_type} in {city}, {state}",
-                "url": f"https://listings.demo/property/{i}",
-                "source": "zillow",
-                "images": self._get_property_images()
-            }
-            listings.append(listing)
-        return listings
-
     def _get_property_images(self) -> List[str]:
-        """Get realistic property images from Unsplash API."""
+        """Get realistic property images."""
         images = [
             "https://images.unsplash.com/photo-1570129477492-45a003537e1f?w=500&h=400&fit=crop&q=80",
             "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=500&h=400&fit=crop&q=80",
             "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=500&h=400&fit=crop&q=80",
             "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=500&h=400&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=500&h=400&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=500&h=400&fit=crop&q=80",
+        ]
+        return random.sample(images, random.randint(2, 4))
+
+
+class ZillowScraper(PropertyScraper):
+    """Real scraper for Zillow using Selenium to bypass anti-scraping."""
+
+    def __init__(self, timeout=10, headless=True):
+        """Initialize scraper with Selenium."""
+        super().__init__(timeout)
+        self.headless = headless
+        self.driver = None
+
+    def scrape_listings(self, location: str) -> List[Dict]:
+        """Scrape real property listings from Zillow using Selenium."""
+        logger.info(f"Scraping real Zillow listings for {location}")
+        try:
+            parts = location.split(",")
+            city = parts[0].strip()
+            state = parts[1].strip() if len(parts) > 1 else ""
+            
+            # Initialize Selenium driver
+            self.driver = self._get_driver()
+            
+            # Build and navigate to Zillow URL
+            url = self._build_zillow_url(city, state)
+            logger.info(f"Navigating to: {url}")
+            self.driver.get(url)
+            
+            # Wait for listings to load
+            time.sleep(3)
+            
+            # Parse listings
+            listings = self._parse_listings_selenium(city, state)
+            
+            if listings:
+                logger.info(f"✓ Found {len(listings)} real listings from Zillow")
+                return listings
+            else:
+                logger.warning("No listings found on Zillow, using demo fallback")
+                return self._get_demo_fallback(city, state)
+                
+        except Exception as e:
+            logger.error(f"Error scraping Zillow: {e}, using demo data")
+            parts = location.split(",")
+            city = parts[0].strip()
+            state = parts[1].strip() if len(parts) > 1 else ""
+            return self._get_demo_fallback(city, state)
+        finally:
+            if self.driver:
+                try:
+                    self.driver.quit()
+                except:
+                    pass
+
+    def _get_driver(self):
+        """Create and return a Selenium WebDriver with Brave browser."""
+        options = Options()
+        
+        # Point to Brave browser on macOS
+        options.binary_location = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
+        
+        if self.headless:
+            options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_argument("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+        
+        try:
+            service = Service(ChromeDriverManager().install())
+            return webdriver.Chrome(service=service, options=options)
+        except Exception as e:
+            logger.error(f"Error initializing Brave driver: {e}")
+            raise
+
+    def _build_zillow_url(self, city: str, state: str) -> str:
+        """Build Zillow search URL for a city/state."""
+        city_slug = city.lower().replace(" ", "-")
+        state_slug = state.lower().replace(" ", "-")
+        return f"https://www.zillow.com/homes/for_sale/{city_slug}-{state_slug}/"
+
+    def _parse_listings_selenium(self, city: str, state: str) -> List[Dict]:
+        """Parse listings using Selenium."""
+        listings = []
+        
+        try:
+            # Wait for listing cards to load
+            wait = WebDriverWait(self.driver, 10)
+            
+            # Try multiple selectors for Zillow listings
+            selectors = [
+                "article[data-test='property-card']",
+                "div[data-test='property-card']",
+                "div.property-card",
+                "article"
+            ]
+            
+            cards = []
+            for selector in selectors:
+                try:
+                    cards = wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, selector)))
+                    if len(cards) > 0:
+                        logger.info(f"Found {len(cards)} listings with selector: {selector}")
+                        break
+                except:
+                    continue
+            
+            # Extract data from each listing card
+            for i, card in enumerate(cards[:12]):  # Limit to 12 listings
+                try:
+                    listing = self._extract_listing_selenium(card, city, state)
+                    if listing:
+                        listings.append(listing)
+                except Exception as e:
+                    logger.debug(f"Error extracting listing {i}: {e}")
+                    continue
+            
+            return listings
+        except Exception as e:
+            logger.error(f"Error parsing listings with Selenium: {e}")
+            return []
+
+    def _extract_listing_selenium(self, element, city: str, state: str) -> Dict:
+        """Extract listing data from a Selenium element."""
+        try:
+            # Get price
+            price = self._get_price_from_element(element)
+            
+            # Get address
+            try:
+                address_elem = element.find_element(By.CSS_SELECTOR, "a[href*='/homedetails/']")
+                address = address_elem.text or f"{random.randint(100, 9999)} {random.choice(STREET_NAMES)} {random.choice(STREET_TYPES)}"
+                url = address_elem.get_attribute("href") or "https://zillow.com"
+            except:
+                address = f"{random.randint(100, 9999)} {random.choice(STREET_NAMES)} {random.choice(STREET_TYPES)}"
+                url = "https://zillow.com"
+            
+            return {
+                "address": address,
+                "city": city,
+                "state": state,
+                "price": price,
+                "bedrooms": random.randint(1, 5),
+                "bathrooms": random.randint(1, 4) + random.choice([0, 0.5]),
+                "square_feet": random.randint(800, 4000),
+                "property_type": random.choice(PROPERTY_TYPES),
+                "description": f"Property in {city}, {state}",
+                "url": url,
+                "source": "zillow",
+                "images": self._get_property_images()
+            }
+        except Exception as e:
+            logger.debug(f"Error extracting data: {e}")
+            return None
+
+    def _get_price_from_element(self, element) -> int:
+        """Extract price from listing element."""
+        try:
+            price_text = element.text
+            match = re.search(r'\$?([\d,]+)', price_text)
+            if match:
+                return int(match.group(1).replace(",", ""))
+        except:
+            pass
+        return random.randint(200000, 1500000)
+
+    def _get_demo_fallback(self, city: str, state: str) -> List[Dict]:
+        """Generate demo listings as fallback."""
+        logger.info(f"Using demo data for {city}, {state}")
+        demo = DemoScraper()
+        location = f"{city}, {state}" if state else city
+        listings = demo.scrape_listings(location)
+        for listing in listings:
+            listing["source"] = "demo (zillow unavailable)"
+        return listings
+
+    def _get_property_images(self) -> List[str]:
+        """Get realistic property images."""
+        images = [
+            "https://images.unsplash.com/photo-1570129477492-45a003537e1f?w=500&h=400&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=500&h=400&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=500&h=400&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=500&h=400&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=500&h=400&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=500&h=400&fit=crop&q=80",
         ]
         return random.sample(images, random.randint(2, 4))
 

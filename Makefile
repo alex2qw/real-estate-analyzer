@@ -38,7 +38,7 @@ clean:
 	rm -f .coverage
 
 run:
-	python -m flask run --host=0.0.0.0 --port=5000
+	./venv/bin/python -m flask run --host=0.0.0.0 --port=5000
 
 db-init:
 	python -c "from src.app import create_app; app = create_app(); app.app_context().push()"
