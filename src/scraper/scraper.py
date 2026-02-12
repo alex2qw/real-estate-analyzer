@@ -14,9 +14,19 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.chrome import ChromeDriverManager
 
 logger = logging.getLogger(__name__)
+
+# Rotating user agents for stealth
+USER_AGENTS = [
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Version/17.1 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+]
 
 # Street name components for generating realistic addresses
 STREET_NAMES = [
@@ -156,7 +166,7 @@ class DemoScraper(PropertyScraper):
 
 
 class ZillowScraper(PropertyScraper):
-    """Real scraper for Zillow using Selenium to bypass anti-scraping."""
+    """Real scraper for Zillow using Selenium with stealth anti-bot bypass."""
 
     def __init__(self, timeout=10, headless=True):
         """Initialize scraper with Selenium."""
@@ -172,16 +182,35 @@ class ZillowScraper(PropertyScraper):
             city = parts[0].strip()
             state = parts[1].strip() if len(parts) > 1 else ""
             
-            # Initialize Selenium driver
+            # Initialize Selenium driver with stealth
             self.driver = self._get_driver()
+            
+            # Inject stealth JS to hide automation
+            self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                "source": """
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => false,
+                    });
+                    Object.defineProperty(navigator, 'plugins', {
+                        get: () => [1, 2, 3, 4, 5],
+                    });
+                    Object.defineProperty(navigator, 'languages', {
+                        get: () => ['en-US', 'en'],
+                    });
+                """
+            })
             
             # Build and navigate to Zillow URL
             url = self._build_zillow_url(city, state)
             logger.info(f"Navigating to: {url}")
             self.driver.get(url)
             
-            # Wait for listings to load
-            time.sleep(3)
+            # Random delay to mimic human behavior
+            time.sleep(random.uniform(2, 5))
+            
+            # Move mouse randomly
+            actions = ActionChains(self.driver)
+            actions.move_by_offset(random.randint(0, 100), random.randint(0, 100)).perform()
             
             # Parse listings
             listings = self._parse_listings_selenium(city, state)
@@ -207,60 +236,106 @@ class ZillowScraper(PropertyScraper):
                     pass
 
     def _get_driver(self):
-        """Create and return a Selenium WebDriver with Brave browser."""
+        """Create and return a Selenium WebDriver with Brave and stealth options."""
         options = Options()
         
-        # Point to Brave browser on macOS
+        # Use Brave browser on macOS
         options.binary_location = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
         
         if self.headless:
-            options.add_argument("--headless")
+            options.add_argument("--headless=new")
+        
+        # Stealth options to bypass detection
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_argument("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+        options.add_argument(f"user-agent={random.choice(USER_AGENTS)}")
+        
+        # Additional stealth arguments
+        options.add_argument("--disable-gpu")
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-plugins")
+        options.add_argument("--disable-sync")
+        
+        # Disable images for faster loading
+        prefs = {"profile.managed_default_content_settings.images": 2}
+        options.add_experimental_option("prefs", prefs)
+        
+        # Exclude automation switches
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option("useAutomationExtension", False)
         
         try:
             service = Service(ChromeDriverManager().install())
-            return webdriver.Chrome(service=service, options=options)
+            driver = webdriver.Chrome(service=service, options=options)
+            logger.info("✓ WebDriver initialized with Brave")
+            
+            # Inject stealth scripts
+            driver.execute_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => false,
+                });
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5],
+                });
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['en-US', 'en'],
+                });
+            """)
+            
+            return driver
         except Exception as e:
-            logger.error(f"Error initializing Brave driver: {e}")
+            logger.error(f"Error initializing WebDriver: {e}")
             raise
 
     def _build_zillow_url(self, city: str, state: str) -> str:
         """Build Zillow search URL for a city/state."""
         city_slug = city.lower().replace(" ", "-")
         state_slug = state.lower().replace(" ", "-")
-        return f"https://www.zillow.com/homes/for_sale/{city_slug}-{state_slug}/"
+        # Use sort by date (newest first) to prioritize recent listings
+        return f"https://www.zillow.com/homes/for_sale/{city_slug}-{state_slug}/?sort=days&status=ForSale"
 
     def _parse_listings_selenium(self, city: str, state: str) -> List[Dict]:
-        """Parse listings using Selenium."""
+        """Parse listings using Selenium with improved selectors."""
         listings = []
         
         try:
-            # Wait for listing cards to load
-            wait = WebDriverWait(self.driver, 10)
+            # Wait for page to fully load and scroll to trigger lazy loading
+            wait = WebDriverWait(self.driver, 15)
             
-            # Try multiple selectors for Zillow listings
+            # Scroll down to load more listings
+            last_height = self.driver.execute_script("return document.body.scrollHeight")
+            for _ in range(3):
+                self.driver.execute_script("window.scrollBy(0, window.innerHeight);")
+                time.sleep(random.uniform(1, 3))
+                new_height = self.driver.execute_script("return document.body.scrollHeight")
+                if new_height == last_height:
+                    break
+                last_height = new_height
+            
+            # Try multiple selectors for Zillow listings (Zillow changes their HTML structure)
             selectors = [
+                "div[data-test='property-card-container']",
                 "article[data-test='property-card']",
                 "div[data-test='property-card']",
                 "div.property-card",
-                "article"
+                "div[itemtype='https://schema.org/ResidentialProperty']",
+                "li.yfJIxO",
+                "article",
             ]
             
             cards = []
             for selector in selectors:
                 try:
                     cards = wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, selector)))
-                    if len(cards) > 0:
-                        logger.info(f"Found {len(cards)} listings with selector: {selector}")
+                    if len(cards) > 2:
+                        logger.info(f"✓ Found {len(cards)} listings with selector: {selector}")
                         break
                 except:
                     continue
             
             # Extract data from each listing card
-            for i, card in enumerate(cards[:12]):  # Limit to 12 listings
+            for i, card in enumerate(cards[:20]):  # Limit to 20 listings
                 try:
                     listing = self._extract_listing_selenium(card, city, state)
                     if listing:
@@ -277,17 +352,29 @@ class ZillowScraper(PropertyScraper):
     def _extract_listing_selenium(self, element, city: str, state: str) -> Dict:
         """Extract listing data from a Selenium element."""
         try:
+            # Get address and URL
+            address = ""
+            url = ""
+            try:
+                # Try to find address link
+                addr_elem = element.find_element(By.CSS_SELECTOR, "a[href*='/homedetails/']")
+                address = addr_elem.text.strip() if addr_elem.text else ""
+                url = addr_elem.get_attribute("href") or "https://zillow.com"
+            except:
+                try:
+                    # Fallback: try to get from different selector
+                    addr_elem = element.find_element(By.TAG_NAME, "a")
+                    address = addr_elem.text.strip() if addr_elem.text else ""
+                    url = addr_elem.get_attribute("href") or "https://zillow.com"
+                except:
+                    pass
+            
             # Get price
             price = self._get_price_from_element(element)
             
-            # Get address
-            try:
-                address_elem = element.find_element(By.CSS_SELECTOR, "a[href*='/homedetails/']")
-                address = address_elem.text or f"{random.randint(100, 9999)} {random.choice(STREET_NAMES)} {random.choice(STREET_TYPES)}"
-                url = address_elem.get_attribute("href") or "https://zillow.com"
-            except:
+            # If we didn't get an address, use demo
+            if not address or len(address) < 3:
                 address = f"{random.randint(100, 9999)} {random.choice(STREET_NAMES)} {random.choice(STREET_TYPES)}"
-                url = "https://zillow.com"
             
             return {
                 "address": address,
@@ -311,9 +398,11 @@ class ZillowScraper(PropertyScraper):
         """Extract price from listing element."""
         try:
             price_text = element.text
-            match = re.search(r'\$?([\d,]+)', price_text)
+            # Look for price patterns like $xxx,xxx or $xxx
+            match = re.search(r'\$\s*([\d,]+)(?:,)?(?:[\d]{0,3})?(?:\s*(?:to|–|-|and)\s*\$\s*([\d,]+))?', price_text)
             if match:
-                return int(match.group(1).replace(",", ""))
+                price_str = match.group(1).replace(",", "")
+                return int(price_str)
         except:
             pass
         return random.randint(200000, 1500000)
